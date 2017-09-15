@@ -206,17 +206,27 @@ func newIngressController(config *Configuration) *GenericController {
 	}
 
 	secrEventHandler := cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			sec := obj.(*api.Secret)
+			key := fmt.Sprintf("%v/%v", sec.Namespace, sec.Name)
+			ic.syncSecret(key)
+			ic.forceReload = true
+			ic.syncQueue.Enqueue(obj)
+		},
 		UpdateFunc: func(old, cur interface{}) {
 			if !reflect.DeepEqual(old, cur) {
 				sec := cur.(*api.Secret)
 				key := fmt.Sprintf("%v/%v", sec.Namespace, sec.Name)
 				ic.syncSecret(key)
+				ic.forceReload = true
+				ic.syncQueue.Enqueue(cur)
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			sec := obj.(*api.Secret)
 			key := fmt.Sprintf("%v/%v", sec.Namespace, sec.Name)
 			ic.sslCertTracker.DeleteAll(key)
+			ic.syncSecret(key)
 		},
 	}
 
